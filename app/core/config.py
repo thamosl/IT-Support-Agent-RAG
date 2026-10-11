@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     gemini_model: str= "gemini-3.6-flash"
     groq_model: str= "openai/gpt-oss-120b"
     top_k: int= 4
-    max_retries: int= 5
+    max_retries: int= 1
     admin_api_key: str= "change-me"
     audit_db_path: str= str(BASE_DIR / "data" / "audit.db")
     upload_db_path: str= str(BASE_DIR / "uploads")

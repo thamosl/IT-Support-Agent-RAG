@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Enterprise IT Support Copilot">
+  <title>IT Support Copilot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><span></span><span></span><span></span></div>
+        <div>
+          <strong>SupportOS</strong>
+          <small>Enterprise Copilot</small>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="copilot">
+          <span class="nav-icon">✦</span><span>Copilot</span>
+        </button>
+        <button class="nav-item" data-view="knowledge">
+          <span class="nav-icon">▤</span><span>Knowledge Base</span>
+        </button>
+        <button class="nav-item" data-view="activity">
+          <span class="nav-icon">◌</span><span>Activity</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-card">
+        <div class="online-dot"></div>
+        <div>
+          <b>All systems operational</b>
+          <p>Knowledge base and search services are connected.</p>
+        </div>
+      </div>
+
+      <div class="sidebar-bottom">
+        <button class="settings-btn" id="settingsBtn">⚙ <span>Settings</span></button>
+        <div class="user-chip">
+          <div class="avatar">TT</div>
+          <div><b>Thamotharan</b><small>IT Support User</small></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="mobile-brand"><div class="brand-mark"><span></span><span></span><span></span></div> SupportOS</div>
+        <div class="topbar-actions">
+          <span class="status-pill"><i></i> AI online</span>
+          <button class="icon-btn" title="Notifications">♢</button>
+          <button class="icon-btn" title="Help">?</button>
+        </div>
+      </header>
+
+      <section id="copilotView" class="view active-view">
+        <div class="hero">
+          <div>
+            <div class="eyebrow">ENTERPRISE IT SUPPORT</div>
+            <h1>How can I help?</h1>
+            <p>Ask about company policies, VPN, passwords, MFA, devices, software access, security, email, or troubleshooting.</p>
+          </div>
+          <div class="architecture">
+            <div class="arch-node"><span>01</span> Route</div>
+            <div class="arch-line"></div>
+            <div class="arch-node"><span>02</span> Private KB</div>
+            <div class="arch-line"></div>
+            <div class="arch-node"><span>03</span> Web fallback</div>
+          </div>
+        </div>
+
+        <div class="content-grid">
+          <section class="chat-card">
+            <div class="card-header">
+              <div>
+                <h2>Support conversation</h2>
+                <span id="sessionLabel">New session · Ready</span>
+              </div>
+              <button class="new-chat" id="newChatBtn">＋ New chat</button>
+            </div>
+
+            <div class="messages" id="messages">
+              <div class="welcome-message">
+                <div class="bot-avatar">✦</div>
+                <div class="message-body">
+                  <div class="message-meta"><b>Support Copilot</b><span>Just now</span></div>
+                  <p>Hello! I can help with enterprise IT support. Ask me a question and I’ll route it through the appropriate knowledge source.</p>
+                  <div class="suggestions">
+                    <button class="suggestion">How do I reset my password?</button>
+                    <button class="suggestion">My VPN is not connecting</button>
+                    <button class="suggestion">How do I request software access?</button>
+                    <button class="suggestion">What is the MFA setup process?</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <form class="composer" id="chatForm">
+              <textarea id="questionInput" rows="1" placeholder="Describe your IT issue..." aria-label="IT support question"></textarea>
+              <div class="composer-bottom">
+                <div class="composer-hints"><span>Private KB first</span><span>⌘ Enter to send</span></div>
+                <button class="send-btn" type="submit">Send <span>↗</span></button>
+              </div>
+            </form>
+          </section>
+
+          <aside class="inspector">
+            <div class="inspector-card">
+              <div class="inspector-title">
+                <div><span class="live-indicator"></span><b>Agent trace</b></div>
+                <span id="traceStatus">Idle</span>
+              </div>
+              <div class="trace-list" id="traceList">
+                <div class="trace-empty">Ask a question to see the agent workflow.</div>
+              </div>
+            </div>
+
+            <div class="inspector-card source-card">
+              <div class="inspector-title"><b>Evidence</b><span id="evidenceBadge" class="neutral-badge">None</span></div>
+              <div id="evidenceContent" class="evidence-empty">
+                Evidence used for the current answer will appear here.
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="knowledgeView" class="view">
+        <div class="page-heading">
+          <div><div class="eyebrow">PRIVATE KNOWLEDGE</div><h1>Knowledge Base</h1><p>Company-approved content available to the support agent.</p></div>
+          <button class="primary-btn">＋ Add source</button>
+        </div>
+        <div class="stats-row">
+          <div class="stat"><span>Documents</span><b>248</b><small>+12 this month</small></div>
+          <div class="stat"><span>Indexed chunks</span><b>8,421</b><small>Vector search ready</small></div>
+          <div class="stat"><span>Last sync</span><b>2m ago</b><small>All sources healthy</small></div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar"><input placeholder="Search knowledge sources..." id="kbSearch"><span>Showing 6 sources</span></div>
+          <table><thead><tr><th>Source</th><th>Type</th><th>Chunks</th><th>Status</th><th>Updated</th></tr></thead>
+          <tbody id="kbTable"></tbody></table>
+        </div>
+      </section>
+
+      <section id="activityView" class="view">
+        <div class="page-heading">
+          <div><div class="eyebrow">OBSERVABILITY</div><h1>Activity</h1><p>Recent agent runs and evidence decisions.</p></div>
+        </div>
+        <div class="activity-list" id="activityList"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="/static/js/script.js"></script>
+</body>
+</html>

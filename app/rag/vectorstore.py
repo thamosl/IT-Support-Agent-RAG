@@ -2,8 +2,8 @@ import time
 from pinecone import Pinecone, ServerlessSpec
 from langchain_pinecone import PineconeVectorStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_huggingface import HuggingFaceEmbeddings
-from app.core.config import get_settings
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+from app.core.config import BASE_DIR, get_settings
 
 settings= get_settings()
 
@@ -42,7 +42,11 @@ def get_embeddings():
     if _embeddings is None:
         model_name = settings.embedding_model.strip()
         if model_name.lower().startswith("sentence-transformers/"):
-            _embeddings = HuggingFaceEmbeddings(model_name=model_name)
+            _embeddings = FastEmbedEmbeddings(
+                model_name=model_name,
+                cache_dir=str(BASE_DIR / ".cache" / "fastembed"),
+                threads=1,
+            )
         else:
             if not settings.gemini_api_key:
                 raise RuntimeError("GEMINI_API_KEY Missing")

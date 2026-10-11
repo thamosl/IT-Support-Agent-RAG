@@ -10,5 +10,6 @@ venv
 .venv
 env
 .pytest_cache
+.cache
 tests
 *.log

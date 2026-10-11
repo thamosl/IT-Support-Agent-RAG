@@ -80,9 +80,24 @@ async function runAgent(question) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question })
   });
-  const payload = await response.json();
+  const responseText = await response.text();
+  let payload;
+  try {
+    payload = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    payload = null;
+  }
   if (!response.ok) {
-    throw new Error(payload.detail || `Request failed (${response.status})`);
+    const message = typeof payload?.detail === "string" ? payload.detail :
+      typeof payload?.error?.message === "string" ? payload.error.message :
+        typeof payload?.message === "string" ? payload.message :
+          response.status >= 500
+            ? `The service is temporarily unavailable (${response.status}). Please try again in a moment.`
+            : `Request failed (${response.status}). Please try again.`;
+    throw new Error(message);
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("The server returned an invalid response. Please try again.");
   }
   if (typeof payload.answer !== "string" || !payload.answer.trim()) {
     throw new Error("The assistant returned an empty answer.");

@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Literal
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
@@ -184,7 +185,13 @@ def route_after_router(state: AgentState) -> Literal["retrieve_kb", "direct_answ
     return "retrieve_kb" if state["source_used"] == "kb" else "direct_answer"
 
 def retrieve_kb(state: AgentState):
-    retrieved_docs = get_retriever().invoke(state["current_query"])
+    logger.info("Starting private knowledge retrieval")
+    started_at = time.monotonic()
+    retriever = get_retriever()
+    logger.info("Initialized private knowledge retriever in %.2f seconds", time.monotonic() - started_at)
+    started_at = time.monotonic()
+    retrieved_docs = retriever.invoke(state["current_query"])
+    logger.info("Completed private knowledge vector search in %.2f seconds", time.monotonic() - started_at)
     docs = []
     seen_chunks = set()
     for document in retrieved_docs:

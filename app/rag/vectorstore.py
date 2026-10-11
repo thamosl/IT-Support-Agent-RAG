@@ -1,3 +1,4 @@
+import logging
 import time
 from pinecone import Pinecone, ServerlessSpec
 from langchain_pinecone import PineconeVectorStore
@@ -6,6 +7,7 @@ from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from app.core.config import BASE_DIR, get_settings
 
 settings= get_settings()
+logger = logging.getLogger(__name__)
 
 _embeddings= None
 _vectorstore= None
@@ -42,10 +44,17 @@ def get_embeddings():
     if _embeddings is None:
         model_name = settings.embedding_model.strip()
         if model_name.lower().startswith("sentence-transformers/"):
+            started_at = time.monotonic()
+            logger.info("Initializing FastEmbed model '%s'", model_name)
             _embeddings = FastEmbedEmbeddings(
                 model_name=model_name,
                 cache_dir=str(BASE_DIR / ".cache" / "fastembed"),
                 threads=1,
+            )
+            logger.info(
+                "Initialized FastEmbed model '%s' in %.2f seconds",
+                model_name,
+                time.monotonic() - started_at,
             )
         else:
             if not settings.gemini_api_key:
@@ -62,10 +71,19 @@ def ensure_index():
 
     desired_dimention= get_embedding_dimention()
     pc= Pinecone(api_key= settings.pinecone_api_key)
+    logger.info("Checking Pinecone index '%s'", settings.pinecone_index_name)
+    started_at = time.monotonic()
     names= [x["name"] for x in pc.list_indexes()]
+    logger.info("Listed Pinecone indexes in %.2f seconds", time.monotonic() - started_at)
 
     if settings.pinecone_index_name in names:
+        started_at = time.monotonic()
         index_info= pc.describe_index(settings.pinecone_index_name)
+        logger.info(
+            "Described Pinecone index '%s' in %.2f seconds",
+            settings.pinecone_index_name,
+            time.monotonic() - started_at,
+        )
         current_dimention= getattr(index_info, "dimension", None)
         if current_dimention is None and isinstance(index_info, dict):
             current_dimention= index_info.get("dimension")

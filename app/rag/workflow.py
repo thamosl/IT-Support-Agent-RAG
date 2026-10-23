@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from typing import Literal
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -8,7 +9,9 @@ from langchain_tavily import TavilySearch
 from langgraph.graph import StateGraph, START, END
 from app.core.config import get_settings
 from app.rag.state import AgentState, RouteDecision, EvidenceGrade
+from app.rag.evaluation import RAGEvaluation, build_judge_prompt, fallback_evaluate
 from app.rag.vectorstore import get_retriever
+from langsmith import traceable
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -107,6 +110,7 @@ def invoke_with_fallback(primary, fallback, prompt):
         logger.warning("Primary %s LLM request failed; trying fallback: %s", _llm_provider, error)
         return fallback.invoke(prompt)
 
+@traceable(run_type="llm", name="invoke_llm")
 def invoke_llm(prompt: str):
     primary = llm()
     fallback = fallback_llm()
@@ -169,6 +173,7 @@ def generated_answer(state: AgentState, response, source: str, trace_message: st
         "trace": add_trace(state, trace_message),
     }
 
+@traceable(run_type="chain", name="route_question")
 def route_question(state: AgentState):
     router = structured_llm(RouteDecision, method="json_mode")
     decision = router.invoke(f"""
@@ -184,6 +189,7 @@ Return valid JSON like {{"route":"kb"}}.
 def route_after_router(state: AgentState) -> Literal["retrieve_kb", "direct_answer"]:
     return "retrieve_kb" if state["source_used"] == "kb" else "direct_answer"
 
+@traceable(run_type="retriever", name="retrieve_kb")
 def retrieve_kb(state: AgentState):
     logger.info("Starting private knowledge retrieval")
     started_at = time.monotonic()
@@ -208,6 +214,7 @@ def retrieve_kb(state: AgentState):
             break
     return {"kb_docs": docs, "trace": add_trace(state, f"Private KB retrieval → {len(docs)} chunks")}
 
+@traceable(run_type="chain", name="grade_kb")
 def grade_kb(state: AgentState):
     if not state["kb_docs"]:
         return {
@@ -228,6 +235,7 @@ Otherwise return weak. JSON: {{"grade":"good"}} or {{"grade":"weak"}}.
 def after_kb(state: AgentState) -> Literal["generate_from_kb", "search_web"]:
     return "generate_from_kb" if state["kb_grade"] == "good" else "search_web"
 
+@traceable(run_type="tool", name="search_web")
 def search_web(state: AgentState):
     result = web_search_tool().invoke({"query": state["current_query"]})
     lines, citations = [], []
@@ -253,6 +261,7 @@ def search_web(state: AgentState):
         "trace": add_trace(state, "Web fallback → Tavily search"),
     }
 
+@traceable(run_type="chain", name="grade_web")
 def grade_web(state: AgentState):
     if not state["web_results"].strip():
         return {
@@ -275,6 +284,7 @@ def after_web(state: AgentState) -> Literal["generate_from_web", "rewrite_query"
         return "rewrite_query"
     return "insufficient"
 
+@traceable(run_type="chain", name="rewrite_query")
 def rewrite_query(state: AgentState):
     rewritten = response_text(invoke_llm(f"""
 Rewrite this IT support question for better private knowledge retrieval and vendor web search.
@@ -290,6 +300,7 @@ Question: {state['question']}
         "trace": add_trace(state, f"Query rewrite → {rewritten}"),
     }
 
+@traceable(run_type="chain", name="generate_from_kb")
 def generate_from_kb(state: AgentState):
     context = "\n\n".join(f"[Source: {d.metadata.get('source','unknown')}]\n{d.page_content}" for d in state["kb_docs"])
     response = invoke_llm(f"""
@@ -310,6 +321,7 @@ Question: {state['question']}\n\nPrivate KB:\n{context}
         "citations": citations,
     }
 
+@traceable(run_type="chain", name="generate_from_web")
 def generate_from_web(state: AgentState):
     response = invoke_llm(f"""
 You are an enterprise IT support copilot. The private company KB was insufficient.
@@ -318,15 +330,77 @@ Question: {state['question']}\n\nWeb evidence:\n{state['web_results']}
 """)
     return generated_answer(state, response, "web_search", "Answer generation → WEB SEARCH")
 
+@traceable(run_type="chain", name="direct_answer")
 def direct_answer(state: AgentState):
     response = invoke_llm(f"Respond briefly and naturally to: {state['question']}")
     return generated_answer(state, response, "direct", "Direct response → no retrieval")
 
+@traceable(run_type="chain", name="insufficient")
 def insufficient(state: AgentState):
     return {
         "answer": "I couldn't find enough reliable evidence in the company knowledge base or external search to answer confidently. Please contact the IT help desk or provide more details.",
         "source_used": "insufficient_evidence",
         "trace": add_trace(state, "Stopped → insufficient reliable evidence"),
+    }
+
+@traceable(run_type="chain", name="evaluate_rag")
+def evaluate_rag(state: AgentState):
+    question = state.get("question", "")
+    answer = state.get("answer", "")
+    source = state.get("source_used", "")
+
+    chunks = []
+    if source == "private_kb" and state.get("kb_docs"):
+        for doc in state["kb_docs"]:
+            chunks.append({
+                "source": doc.metadata.get("source", "Private KB"),
+                "content": doc.page_content,
+            })
+    elif source == "web_search" and state.get("web_results"):
+        raw_web = state["web_results"]
+        sections = [s.strip() for s in raw_web.split("\n\n") if s.strip()]
+        for s in sections:
+            title = "Web Evidence"
+            for line in s.splitlines():
+                if line.startswith("Title:"):
+                    title = line.replace("Title:", "").strip()
+                    break
+            chunks.append({
+                "source": title,
+                "content": s,
+            })
+    elif state.get("kb_docs"):
+        for doc in state["kb_docs"]:
+            chunks.append({
+                "source": doc.metadata.get("source", "Private KB"),
+                "content": doc.page_content,
+            })
+    elif state.get("web_results"):
+        chunks.append({
+            "source": "Web Search",
+            "content": state["web_results"],
+        })
+
+    eval_result = None
+    try:
+        judge = structured_llm(RAGEvaluation, method="json_mode")
+        prompt = build_judge_prompt(question, chunks, answer, source)
+        raw_eval = judge.invoke(prompt)
+        if isinstance(raw_eval, RAGEvaluation):
+            eval_result = raw_eval
+        elif isinstance(raw_eval, dict):
+            eval_result = RAGEvaluation.model_validate(raw_eval)
+    except Exception as exc:
+        logger.warning("LLM Judge evaluation encountered an issue; falling back to deterministic evaluator: %s", exc)
+
+    if eval_result is None:
+        eval_result = fallback_evaluate(question, chunks, answer, source)
+
+    score_pct = int(eval_result.overall_score * 100)
+    trace_msg = f"LLM Judge → {eval_result.verdict} (Score: {score_pct}%)"
+    return {
+        "evaluation": eval_result.model_dump(),
+        "trace": add_trace(state, trace_msg),
     }
 
 def build_graph():
@@ -342,6 +416,7 @@ def build_graph():
         "generate_from_web": generate_from_web,
         "direct_answer": direct_answer,
         "insufficient": insufficient,
+        "evaluate_rag": evaluate_rag,
     }.items():
         graph.add_node(name, fn)
 
@@ -358,14 +433,16 @@ def build_graph():
         "generate_from_web": "generate_from_web", "rewrite_query": "rewrite_query", "insufficient": "insufficient"
     })
     graph.add_edge("rewrite_query", "retrieve_kb")
-    graph.add_edge("generate_from_kb", END)
-    graph.add_edge("generate_from_web", END)
-    graph.add_edge("direct_answer", END)
-    graph.add_edge("insufficient", END)
+    graph.add_edge("generate_from_kb", "evaluate_rag")
+    graph.add_edge("generate_from_web", "evaluate_rag")
+    graph.add_edge("direct_answer", "evaluate_rag")
+    graph.add_edge("insufficient", "evaluate_rag")
+    graph.add_edge("evaluate_rag", END)
     return graph.compile()
 
 agent_graph = build_graph()
 
+@traceable(run_type="chain", name="ask_question", tags=["rag", "it-support"])
 def ask_question(question: str):
     initial: AgentState = {
         "question": question,
@@ -379,8 +456,15 @@ def ask_question(question: str):
         "retry_count": 0,
         "trace": [],
         "citations": [],
+        "evaluation": {},
     }
-    return agent_graph.invoke(
-        initial,
-        config={"recursion_limit": max(25, (settings.max_retries + 1) * 6 + 10)},
-    )
+    run_config = {
+        "recursion_limit": max(25, (settings.max_retries + 1) * 6 + 10),
+        "metadata": {
+            "agent_id": os.environ.get("LANGSMITH_AGENT_ID", "IT Support RAG"),
+            "environment": os.environ.get("LANGSMITH_AGENT_ENVIRONMENT", "production"),
+            "question": question[:200],
+        },
+        "tags": ["rag", "it-support"],
+    }
+    return agent_graph.invoke(initial, config=run_config)

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Enterprise IT Support Copilot">
-  <title>IT Support Copilot</title>
+  <meta name="description" content="Enterprise IT Support Copilot with LLM-as-a-Judge RAG Evaluation">
+  <title>IT Support Copilot & RAG Evaluation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -17,19 +17,19 @@
         <div class="brand-mark"><span></span><span></span><span></span></div>
         <div>
           <strong>SupportOS</strong>
-          <small>Enterprise Copilot</small>
+          <small>Enterprise Copilot & Eval</small>
         </div>
       </div>
 
       <nav class="nav">
-        <button class="nav-item active" data-view="copilot">
+        <button class="nav-item active" data-view="copilot" id="navCopilot">
           <span class="nav-icon">✦</span><span>Copilot</span>
         </button>
-        <button class="nav-item" data-view="knowledge">
+        <button class="nav-item" data-view="knowledge" id="navKnowledge">
           <span class="nav-icon">▤</span><span>Knowledge Base</span>
         </button>
-        <button class="nav-item" data-view="activity">
-          <span class="nav-icon">◌</span><span>Activity</span>
+        <button class="nav-item" data-view="activity" id="navActivity">
+          <span class="nav-icon">⚖</span><span>Evaluation & Logs</span>
         </button>
       </nav>
 
@@ -37,7 +37,7 @@
         <div class="online-dot"></div>
         <div>
           <b>All systems operational</b>
-          <p>Knowledge base and search services are connected.</p>
+          <p>RAG pipeline & LLM Judge evaluator online.</p>
         </div>
       </div>
 
@@ -54,25 +54,28 @@
       <header class="topbar">
         <div class="mobile-brand"><div class="brand-mark"><span></span><span></span><span></span></div> SupportOS</div>
         <div class="topbar-actions">
-          <span class="status-pill"><i></i> AI online</span>
+          <span class="status-pill"><i></i> AI & Judge online</span>
           <button class="icon-btn" title="Notifications">♢</button>
           <button class="icon-btn" title="Help">?</button>
         </div>
       </header>
 
+      <!-- VIEW: COPILOT -->
       <section id="copilotView" class="view active-view">
         <div class="hero">
           <div>
-            <div class="eyebrow">ENTERPRISE IT SUPPORT</div>
+            <div class="eyebrow">ENTERPRISE IT SUPPORT & RAG OBSERVABILITY</div>
             <h1>How can I help?</h1>
             <p>Ask about company policies, VPN, passwords, MFA, devices, software access, security, email, or troubleshooting.</p>
           </div>
           <div class="architecture">
             <div class="arch-node"><span>01</span> Route</div>
             <div class="arch-line"></div>
-            <div class="arch-node"><span>02</span> Private KB</div>
+            <div class="arch-node"><span>02</span> Retrieve & Grade</div>
             <div class="arch-line"></div>
-            <div class="arch-node"><span>03</span> Web fallback</div>
+            <div class="arch-node"><span>03</span> Generate</div>
+            <div class="arch-line"></div>
+            <div class="arch-node"><span>04</span> ⚖️ LLM Judge</div>
           </div>
         </div>
 
@@ -91,7 +94,7 @@
                 <div class="bot-avatar">✦</div>
                 <div class="message-body">
                   <div class="message-meta"><b>Support Copilot</b><span>Just now</span></div>
-                  <p>Hello! I can help with enterprise IT support. Ask me a question and I’ll route it through the appropriate knowledge source.</p>
+                  <p>Hello! I can help with enterprise IT support. Every answer is evaluated in real time by our automated <b>LLM-as-a-Judge</b> for retrieval relevance, groundedness, and answer quality.</p>
                   <div class="suggestions">
                     <button class="suggestion">How do I reset my password?</button>
                     <button class="suggestion">My VPN is not connecting</button>
@@ -105,13 +108,94 @@
             <form class="composer" id="chatForm">
               <textarea id="questionInput" rows="1" placeholder="Describe your IT issue..." aria-label="IT support question"></textarea>
               <div class="composer-bottom">
-                <div class="composer-hints"><span>Private KB first</span><span>⌘ Enter to send</span></div>
+                <div class="composer-hints"><span>Private KB first</span><span>⌘ Enter to send</span><span>⚖️ LLM Judge scored</span></div>
                 <button class="send-btn" type="submit">Send <span>↗</span></button>
               </div>
             </form>
           </section>
 
           <aside class="inspector">
+            <!-- 1. LLM-as-a-Judge & RAG Metrics Card -->
+            <div class="inspector-card eval-card" id="evalCard">
+              <div class="inspector-title">
+                <div><span class="judge-icon">⚖️</span><b>LLM Judge & RAG Metrics</b></div>
+                <span id="evalVerdictBadge" class="eval-pill eval-idle">Awaiting Eval</span>
+              </div>
+
+              <div id="evalEmptyState" class="eval-empty">
+                Ask a question to see real-time LLM-as-a-Judge RAG evaluation metrics.
+              </div>
+
+              <div id="evalActiveState" class="eval-body" style="display:none;">
+                <!-- Overall Score Gauge & Verdict -->
+                <div class="overall-score-panel">
+                  <div class="score-dial">
+                    <svg viewBox="0 0 36 36" class="circular-chart">
+                      <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                      <path id="overallScoreCircle" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    </svg>
+                    <div class="score-inner">
+                      <span id="overallScoreText" class="score-number">0%</span>
+                      <small>Overall Score</small>
+                    </div>
+                  </div>
+                  <div class="verdict-summary">
+                    <div class="verdict-title" id="evalVerdictTitle">PASS</div>
+                    <p class="judge-quote" id="evalCritiqueText">Evaluating...</p>
+                  </div>
+                </div>
+
+                <!-- 3 Core Dimensions -->
+                <div class="metrics-grid">
+                  <!-- Context Relevance -->
+                  <div class="metric-row">
+                    <div class="metric-header">
+                      <span class="metric-name"><b>Context Relevance</b> <small>(Query ↔ Chunks)</small></span>
+                      <span class="metric-value" id="contextRelValue">0%</span>
+                    </div>
+                    <div class="metric-bar-track">
+                      <div class="metric-bar-fill" id="contextRelBar" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-reasoning" id="contextRelReasoning"></div>
+                  </div>
+
+                  <!-- Groundedness / Faithfulness -->
+                  <div class="metric-row">
+                    <div class="metric-header">
+                      <span class="metric-name"><b>Groundedness</b> <small>(Answer ↔ Context)</small></span>
+                      <span class="metric-value" id="groundednessValue">0%</span>
+                    </div>
+                    <div class="metric-bar-track">
+                      <div class="metric-bar-fill" id="groundednessBar" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-reasoning" id="groundednessReasoning"></div>
+                  </div>
+
+                  <!-- Answer Relevancy -->
+                  <div class="metric-row">
+                    <div class="metric-header">
+                      <span class="metric-name"><b>Answer Relevancy</b> <small>(Query ↔ Answer)</small></span>
+                      <span class="metric-value" id="answerRelValue">0%</span>
+                    </div>
+                    <div class="metric-bar-track">
+                      <div class="metric-bar-fill" id="answerRelBar" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-reasoning" id="answerRelReasoning"></div>
+                  </div>
+                </div>
+
+                <!-- Retrieved Chunk Scoring Breakdown -->
+                <div class="chunk-eval-section">
+                  <div class="chunk-eval-header" id="chunkEvalToggle">
+                    <span><b>Retrieved Chunks Scoring</b> (<span id="chunkCount">0</span>)</span>
+                    <span class="toggle-icon" id="chunkToggleIcon">▾</span>
+                  </div>
+                  <div class="chunk-eval-list" id="chunkEvalList"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Agent Trace Card -->
             <div class="inspector-card">
               <div class="inspector-title">
                 <div><span class="live-indicator"></span><b>Agent trace</b></div>
@@ -122,6 +206,7 @@
               </div>
             </div>
 
+            <!-- 3. Evidence Card -->
             <div class="inspector-card source-card">
               <div class="inspector-title"><b>Evidence</b><span id="evidenceBadge" class="neutral-badge">None</span></div>
               <div id="evidenceContent" class="evidence-empty">
@@ -132,6 +217,7 @@
         </div>
       </section>
 
+      <!-- VIEW: KNOWLEDGE BASE -->
       <section id="knowledgeView" class="view">
         <div class="page-heading">
           <div><div class="eyebrow">PRIVATE KNOWLEDGE</div><h1>Knowledge Base</h1><p>Company-approved content available to the support agent.</p></div>
@@ -149,11 +235,52 @@
         </div>
       </section>
 
+      <!-- VIEW: EVALUATION & ACTIVITY OBSERVABILITY -->
       <section id="activityView" class="view">
         <div class="page-heading">
-          <div><div class="eyebrow">OBSERVABILITY</div><h1>Activity</h1><p>Recent agent runs and evidence decisions.</p></div>
+          <div>
+            <div class="eyebrow">RAG OBSERVABILITY & BENCHMARKING</div>
+            <h1>Evaluation & Activity</h1>
+            <p>Continuous monitoring of retrieval relevance, groundedness, answer accuracy, and LLM Judge verdicts.</p>
+          </div>
+          <button class="primary-btn" id="refreshActivityBtn">↻ Refresh metrics</button>
         </div>
-        <div class="activity-list" id="activityList"></div>
+
+        <div class="stats-row eval-stats-row">
+          <div class="stat eval-stat-card">
+            <span>Average RAG Score</span>
+            <b id="summaryAvgScore">—</b>
+            <small id="summaryPassRate">Pass rate: —</small>
+          </div>
+          <div class="stat eval-stat-card">
+            <span>Avg Context Relevance</span>
+            <b id="summaryAvgContext">—</b>
+            <small>Retrieval precision</small>
+          </div>
+          <div class="stat eval-stat-card">
+            <span>Avg Groundedness</span>
+            <b id="summaryAvgGrounded">—</b>
+            <small>Hallucination resistance</small>
+          </div>
+          <div class="stat eval-stat-card">
+            <span>Avg Answer Relevancy</span>
+            <b id="summaryAvgAnswer">—</b>
+            <small>Query intent alignment</small>
+          </div>
+        </div>
+
+        <div class="table-card activity-table-card">
+          <div class="table-toolbar">
+            <div class="filter-group">
+              <button class="filter-chip active" data-filter="all">All runs</button>
+              <button class="filter-chip" data-filter="pass">Pass</button>
+              <button class="filter-chip" data-filter="warning">Warning</button>
+              <button class="filter-chip" data-filter="fail">Fail</button>
+            </div>
+            <input placeholder="Search query or source..." id="activitySearch">
+          </div>
+          <div class="activity-list" id="activityList"></div>
+        </div>
       </section>
     </main>
   </div>

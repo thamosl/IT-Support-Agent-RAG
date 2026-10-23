@@ -5,7 +5,7 @@ from app.core.config import get_settings
 from app.rag.workflow import ask_question
 from app.rag.vectorstore import add_documents
 from app.services.ingestion import load_file, chunk_documents, SUPPORTED
-from app.services.audit import write_audit
+from app.services.audit import write_audit, get_recent_audits, get_evaluations_summary
 
 router= APIRouter(prefix="/api")
 settings= get_settings()
@@ -21,17 +21,27 @@ def health():
 def chat(payload: ChatRequest):
     try:
         result= ask_question(payload.question)
-        write_audit(payload.question, result["source_used"], result.get("trace", []))
+        evaluation = result.get("evaluation", {})
+        write_audit(payload.question, result["source_used"], result.get("trace", []), evaluation)
 
         return {
             "answer": result["answer"],
             "source_used": result["source_used"],
             "trace": result.get("trace", []),
-            "citations": result.get("citations", [])
+            "citations": result.get("citations", []),
+            "evaluation": evaluation
         }
 
     except Exception as e:
         raise HTTPException(status_code= 500, detail=str(e)) from e
+
+@router.get("/activity")
+def get_activity(limit: int = 50):
+    return {"activities": get_recent_audits(limit=limit)}
+
+@router.get("/evaluations/summary")
+def get_summary():
+    return get_evaluations_summary()
 
 
 @router.post("/ingest")

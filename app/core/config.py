@@ -25,12 +25,13 @@ class Settings(BaseSettings):
     sample_kb_dir: str= str(BASE_DIR / "data" / "sample_kb")
 
     # LangSmith observability
-    langsmith_api_key: str= ""
-    langsmith_project: str= "IT SUPPORT Agentic rag"
-    langsmith_endpoint: str= "https://api.smith.langchain.com"
-    langsmith_tracing: str= "true"
-    langsmith_agent_id: str= "IT Support RAG"
-    langsmith_agent_environment: str= "production"
+    langsmith_api_key: str = ""
+    langchain_api_key: str = ""
+    langsmith_project: str = "IT SUPPORT Agentic rag"
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_tracing: str = "true"
+    agent_id: str = "it-support-agent"
+    agent_environment: str = "production"
 
     model_config= SettingsConfigDict(env_file=str(BASE_DIR / ".env"), extra="ignore")
 

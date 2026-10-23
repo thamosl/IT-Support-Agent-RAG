@@ -461,8 +461,8 @@ def ask_question(question: str):
     run_config = {
         "recursion_limit": max(25, (settings.max_retries + 1) * 6 + 10),
         "metadata": {
-            "agent_id": os.environ.get("LANGSMITH_AGENT_ID", "IT Support RAG"),
-            "environment": os.environ.get("LANGSMITH_AGENT_ENVIRONMENT", "production"),
+            "agent_id": getattr(settings, "agent_id", "it-support-agent"),
+            "environment": getattr(settings, "agent_environment", "production"),
             "question": question[:200],
         },
         "tags": ["rag", "it-support"],

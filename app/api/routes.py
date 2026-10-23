@@ -43,6 +43,40 @@ def get_activity(limit: int = 50):
 def get_summary():
     return get_evaluations_summary()
 
+@router.get("/langsmith/status")
+def get_langsmith_status():
+    import os
+    api_key = os.environ.get("LANGSMITH_API_KEY") or os.environ.get("LANGCHAIN_API_KEY") or ""
+    project = os.environ.get("LANGSMITH_PROJECT") or os.environ.get("LANGCHAIN_PROJECT") or ""
+    tracing = os.environ.get("LANGSMITH_TRACING") == "true" or os.environ.get("LANGCHAIN_TRACING_V2") == "true"
+    masked_key = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else ("configured" if api_key else "missing")
+
+    status = {
+        "tracing_enabled": tracing,
+        "api_key_configured": bool(api_key),
+        "api_key_preview": masked_key,
+        "project": project,
+        "endpoint": os.environ.get("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com"),
+    }
+
+    if api_key and tracing:
+        try:
+            from langsmith import Client
+            client = Client()
+            status["client_ready"] = bool(client.api_key)
+            status["message"] = "LangSmith is configured and ready"
+        except Exception as exc:
+            status["client_ready"] = False
+            status["error"] = str(exc)
+    else:
+        status["client_ready"] = False
+        status["message"] = (
+            "Tracing is disabled or API key is missing. "
+            "Ensure LANGSMITH_API_KEY, LANGSMITH_TRACING=true, and LANGSMITH_PROJECT are set in Render."
+        )
+
+    return status
+
 
 @router.post("/ingest")
 async def ingest(file: UploadFile= File(...), x_admin_key: str= Header(default="")):
